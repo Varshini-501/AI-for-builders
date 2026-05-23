@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocGen AI — Technical Documentation Generator</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f0f0f; --bg2: #1a1a1a; --bg3: #242424;
+    --text: #e8e8e8; --text2: #999; --text3: #666;
+    --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.18);
+    --green: #1D9E75; --green-bg: #0a2e22; --green-text: #5DCAA5;
+    --red: #E24B4A;
+    --radius: 10px; --radius-sm: 7px;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; }
+  .header { display: flex; align-items: center; gap: 12px; margin-bottom: 2rem; }
+  .logo-icon { width: 36px; height: 36px; background: var(--green-bg); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .header h1 { font-size: 22px; font-weight: 600; }
+  .logo-badge { background: var(--green-bg); color: var(--green-text); font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 99px; border: 1px solid rgba(29,158,117,0.3); }
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+  select { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 13px; color: var(--text); outline: none; cursor: pointer; height: 38px; }
+  select:hover { border-color: var(--border2); }
+  .spacer { flex: 1; }
+  .btn-generate { height: 38px; padding: 0 20px; background: var(--green); color: #fff; border: none; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 7px; transition: opacity 0.15s; }
+  .btn-generate:hover { opacity: 0.85; }
+  .btn-generate:disabled { opacity: 0.4; cursor: not-allowed; }
+  .samples-row { display: flex; gap: 8px; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+  .samples-row span { font-size: 12px; color: var(--text3); }
+  .sample-btn { font-size: 12px; color: var(--text2); background: var(--bg2); border: 1px solid var(--border); border-radius: 99px; padding: 5px 14px; cursor: pointer; transition: all 0.15s; }
+  .sample-btn:hover { background: var(--bg3); color: var(--text); border-color: var(--border2); }
+  .sample-btn.active { background: var(--green-bg); color: var(--green-text); border-color: rgba(29,158,117,0.4); }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
+  .col-label { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
+  textarea { width: 100%; border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; font-family: 'Fira Code', monospace; font-size: 12.5px; line-height: 1.7; color: var(--text); background: var(--bg2); resize: vertical; min-height: 380px; outline: none; transition: border-color 0.15s; }
+  textarea:focus { border-color: var(--border2); }
+  .output-box { border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; background: var(--bg2); min-height: 380px; overflow-y: auto; }
+  .output-box.empty { display: flex; align-items: center; justify-content: center; }
+  .placeholder { text-align: center; color: var(--text3); font-size: 13px; line-height: 1.8; }
+  .placeholder-icon { font-size: 36px; margin-bottom: 10px; opacity: 0.3; display: block; }
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 1.5rem 0; }
+  @media (max-width: 600px) { .stat-row { grid-template-columns: repeat(2,1fr); } }
+  .stat { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; }
+  .stat-val { font-size: 22px; font-weight: 600; color: var(--green-text); }
+  .stat-lbl { font-size: 11px; color: var(--text3); margin-top: 3px; }
+  .tabs-section { margin-top: 0; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 1rem; }
+  .tab { font-size: 13px; padding: 8px 16px; cursor: pointer; color: var(--text2); border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; border-top: none; border-left: none; border-right: none; transition: all 0.15s; }
+  .tab.active { color: var(--green-text); border-bottom-color: var(--green-text); font-weight: 500; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .doc-md h1 { font-size: 18px; font-weight: 600; margin: 0 0 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  .doc-md h2 { font-size: 15px; font-weight: 600; margin: 20px 0 8px; color: var(--text); }
+  .doc-md h3 { font-size: 13px; font-weight: 600; margin: 14px 0 6px; color: var(--green-text); }
+  .doc-md p { margin-bottom: 10px; font-size: 13.5px; line-height: 1.7; }
+  .doc-md ul { padding-left: 18px; margin-bottom: 10px; }
+  .doc-md li { margin-bottom: 4px; font-size: 13.5px; line-height: 1.6; }
+  .doc-md code { font-family: monospace; font-size: 12px; background: var(--bg3); padding: 2px 6px; border-radius: 4px; color: #9FE1CB; }
+  .doc-md pre { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; font-family: monospace; font-size: 12px; overflow-x: auto; margin-bottom: 12px; line-height: 1.6; }
+  .doc-md pre code { background: none; padding: 0; color: #ccc; }
+  .doc-md blockquote { border-left: 3px solid var(--green); padding-left: 14px; color: var(--text2); margin: 10px 0; font-size: 13px; }
+  .doc-md table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 12px; }
+  .doc-md th { background: var(--bg3); font-weight: 600; padding: 8px 12px; text-align: left; border: 1px solid var(--border); }
+  .doc-md td { padding: 8px 12px; border: 1px solid var(--border); vertical-align: top; }
+  .doc-md strong { font-weight: 600; }
+  .btn-sm { font-size: 12px; color: var(--text2); background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 5px 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.15s; }
+  .btn-sm:hover { background: var(--bg2); color: var(--text); border-color: var(--border2); }
+  .raw-box { font-family: monospace; font-size: 12px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; color: var(--text2); background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; min-height: 200px; }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--bg3); color: var(--text); border: 1px solid var(--border2); font-size: 13px; padding: 12px 18px; border-radius: var(--radius-sm); display: none; z-index: 99; }
+  .toast.show { display: block; animation: fadeIn 0.2s; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+  .spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.25); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .typing-cursor { display: inline-block; width: 2px; height: 14px; background: var(--green-text); margin-left: 2px; animation: blink 0.8s infinite; vertical-align: middle; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="logo-icon">📄</div>
+    <h1>DocGen AI</h1>
+    <span class="logo-badge">AI-Powered</span>
+  </div>
+
+  <div class="toolbar">
+    <select id="lang-select">
+      <option value="auto">Auto-detect language</option>
+      <option value="javascript">JavaScript / Node.js</option>
+      <option value="python">Python</option>
+      <option value="typescript">TypeScript</option>
+      <option value="java">Java</option>
+      <option value="go">Go</option>
+      <option value="sql">SQL</option>
+    </select>
+    <select id="doc-style">
+      <option value="full">Full documentation</option>
+      <option value="readme">README style</option>
+      <option value="api">API reference</option>
+      <option value="inline">Inline comments</option>
+    </select>
+    <div class="spacer"></div>
+    <button class="btn-generate" id="gen-btn" onclick="generateDocs()">
+      ✦ Generate Docs
+    </button>
+  </div>
+
+  <div class="samples-row">
+    <span>Samples:</span>
+    <button class="sample-btn" id="s-js" onclick="loadSample('js')">Express Auth API</button>
+    <button class="sample-btn" id="s-py" onclick="loadSample('py')">Python LRU Cache</button>
+    <button class="sample-btn" id="s-sql" onclick="loadSample('sql')">SQL Analytics</button>
+    <button class="sample-btn" id="s-ts" onclick="loadSample('ts')">TypeScript Service</button>
+  </div>
+
+  <div class="two-col">
+    <div>
+      <div class="col-label">your code</div>
+      <textarea id="code-input" placeholder="Paste your code here or click a sample above..."></textarea>
+    </div>
+    <div>
+      <div class="col-label">
+        <span>generated documentation</span>
+        <button class="btn-sm" id="copy-btn" onclick="copyDoc()" style="display:none;">📋 Copy markdown</button>
+      </div>
+      <div class="output-box empty" id="output-box">
+        <div class="placeholder">
+          <span class="placeholder-icon">📝</span>
+          Paste code and click <strong style="color:var(--text2)">Generate Docs</strong><br>to see AI-generated documentation
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="stats-section" style="display:none;">
+    <div class="stat-row">
+      <div class="stat"><div class="stat-val" id="stat-funcs">—</div><div class="stat-lbl">Functions / methods</div></div>
+      <div class="stat"><div class="stat-val" id="stat-lines">—</div><div class="stat-lbl">Lines analyzed</div></div>
+      <div class="stat"><div class="stat-val" id="stat-tokens">—</div><div class="stat-lbl">Tokens generated</div></div>
+      <div class="stat"><div class="stat-val" id="stat-time">—</div><div class="stat-lbl">Generation time</div></div>
+    </div>
+  </div>
+
+  <div class="tabs-section" id="tabs-section" style="display:none;">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('preview')">Preview</button>
+      <button class="tab" onclick="switchTab('markdown')">Markdown source</button>
+    </div>
+    <div id="tab-preview" class="panel active"></div>
+    <div id="tab-markdown" class="panel">
+      <pre class="raw-box" id="raw-md"></pre>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">✓ Copied to clipboard!</div>
+
+<script>
+// ─── SAMPLE CODE ───────────────────────────────────────────────────────────
+const SAMPLES = {
+  js: `// Express REST API for user authentication
+const express = require('express');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const router = express.Router();
+
+const SALT_ROUNDS = 10;
+const TOKEN_EXPIRY = '7d';
+
+async function registerUser(req, res) {
+  const { email, password, name } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+  const existing = await db.users.findOne({ email });
+  if (existing) return res.status(409).json({ error: 'Email already registered' });
+  const hashed = await bcrypt.hash(password, SALT_ROUNDS);
+  const user = await db.users.create({ email, password: hashed, name });
+  const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: TOKEN_EXPIRY });
+  res.status(201).json({ user: { id: user.id, email, name }, token });
+}
+
+async function loginUser(req, res) {
+  const { email, password } = req.body;
+  const user = await db.users.findOne({ email });
+  if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+  const valid = await bcrypt.compare(password, user.password);
+  if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+  const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: TOKEN_EXPIRY });
+  res.json({ token, user: { id: user.id, email, name: user.name } });
+}
+
+function authMiddleware(req, res, next) {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'No token provided' });
+  try {
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch {
+    res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
+
+router.post('/register', registerUser);
+router.post('/login', loginUser);
+router.get('/profile', authMiddleware, (req, res) => res.json({ userId: req.user.userId }));
+module.exports = router;`,
+
+  py: `from dataclasses import dataclass
+from typing import Optional, List, Any
+import time
+
+@dataclass
+class CacheEntry:
+    key: str
+    value: Any
+    expires_at: float
+    hits: int = 0
+
+class LRUCache:
+    """Thread-safe LRU cache with TTL support and statistics."""
+
+    def __init__(self, capacity: int, default_ttl: int = 300):
+        self.capacity = capacity
+        self.default_ttl = default_ttl
+        self._store: dict[str, CacheEntry] = {}
+        self._order: List[str] = []
+
+    def get(self, key: str) -> Optional[Any]:
+        if key not in self._store:
+            return None
+        entry = self._store[key]
+        if time.time() > entry.expires_at:
+            self._evict(key)
+            return None
+        entry.hits += 1
+        self._order.remove(key)
+        self._order.append(key)
+        return entry.value
+
+    def set(self, key: str, value: Any, ttl: int = None) -> None:
+        if key in self._store:
+            self._evict(key)
+        elif len(self._store) >= self.capacity:
+            self._evict(self._order[0])
+        ttl = ttl or self.default_ttl
+        self._store[key] = CacheEntry(key, value, time.time() + ttl)
+        self._order.append(key)
+
+    def _evict(self, key: str) -> None:
+        if key in self._store:
+            del self._store[key]
+            if key in self._order:
+                self._order.remove(key)
+
+    def stats(self) -> dict:
+        return {
+            'size': len(self._store),
+            'capacity': self.capacity,
+            'hit_count': sum(e.hits for e in self._store.values())
+        }`,
+
+  sql: `-- User analytics queries for dashboard reporting
+
+-- Daily active users for the last 30 days
+SELECT
+  DATE(created_at) as date,
+  COUNT(DISTINCT user_id) as dau,
+  COUNT(*) as total_events
+FROM user_events
+WHERE created_at >= NOW() - INTERVAL '30 days'
+  AND event_type NOT IN ('bot', 'internal')
+GROUP BY DATE(created_at)
+ORDER BY date DESC;
+
+-- User retention cohort analysis
+WITH cohorts AS (
+  SELECT user_id, DATE_TRUNC('week', MIN(created_at)) as cohort_week
+  FROM users GROUP BY user_id
+),
+activity AS (
+  SELECT DISTINCT user_id, DATE_TRUNC('week', created_at) as activity_week
+  FROM user_events
+)
+SELECT
+  c.cohort_week,
+  COUNT(DISTINCT c.user_id) as cohort_size,
+  a.activity_week,
+  COUNT(DISTINCT a.user_id) as retained_users,
+  ROUND(COUNT(DISTINCT a.user_id)::numeric / COUNT(DISTINCT c.user_id) * 100, 1) as retention_pct
+FROM cohorts c
+LEFT JOIN activity a ON c.user_id = a.user_id
+GROUP BY c.cohort_week, a.activity_week
+ORDER BY c.cohort_week, a.activity_week;`,
+
+  ts: `import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+
+interface NotificationPayload {
+  userId: string;
+  type: 'email' | 'sms' | 'push';
+  title: string;
+  body: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface SendResult {
+  success: boolean;
+  messageId?: string;
+  error?: string;
+  attempts: number;
+}
+
+@Injectable()
+export class NotificationService {
+  private readonly MAX_RETRIES = 3;
+  private readonly logger = new Logger(NotificationService.name);
+
+  constructor(
+    @InjectRepository(Notification) private repo: Repository<Notification>,
+    private events: EventEmitter2
+  ) {}
+
+  async send(payload: NotificationPayload): Promise<SendResult> {
+    const notification = await this.repo.save({ ...payload, status: 'pending' });
+    let attempt = 0;
+    while (attempt < this.MAX_RETRIES) {
+      try {
+        const result = await this.dispatch(payload);
+        await this.repo.update(notification.id, { status: 'sent', messageId: result.messageId });
+        this.events.emit('notification.sent', { id: notification.id, ...payload });
+        return { success: true, messageId: result.messageId, attempts: attempt + 1 };
+      } catch (err) {
+        attempt++;
+        if (attempt === this.MAX_RETRIES) {
+          await this.repo.update(notification.id, { status: 'failed', error: err.message });
+          return { success: false, error: err.message, attempts: attempt };
+        }
+        await this.sleep(1000 * attempt);
+      }
+    }
+  }
+
+  private async dispatch(payload: NotificationPayload) {
+    const providers = { email: this.sendEmail, sms: this.sendSMS, push: this.sendPush };
+    return providers[payload.type]?.call(this, payload);
+  }
+
+  private sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+}`
+};
+
+// ─── PRE-GENERATED AI DOCS ─────────────────────────────────────────────────
+const MOCK_DOCS = {
+  js: `# User Authentication API
+
+## Overview
+
+A secure Express.js REST API module that handles user registration, login, and JWT-based route protection. Built with **bcrypt** for password hashing and **jsonwebtoken** for stateless authentication.
+
+## Installation
+
+\`\`\`bash
+npm install express bcrypt jsonwebtoken
+\`\`\`
+
+Set the required environment variable:
+
+\`\`\`bash
+JWT_SECRET=your_super_secret_key_here
+\`\`\`
+
+## API Endpoints
+
+| Method | Endpoint | Auth Required | Description |
+|--------|----------|---------------|-------------|
+| POST | \`/register\` | No | Create a new user account |
+| POST | \`/login\` | No | Authenticate and receive JWT |
+| GET | \`/profile\` | Yes | Get authenticated user profile |
+
+## Functions
+
+### \`registerUser(req, res)\`
+
+Registers a new user with email/password authentication.
+
+**Request body:**
+\`\`\`json
+{ "email": "user@example.com", "password": "secret123", "name": "Alice" }
+\`\`\`
+
+**Validation:** Returns \`400\` if email or password is missing. Returns \`409\` if email already exists.
+
+**Success response (201):**
+\`\`\`json
+{ "user": { "id": "abc123", "email": "user@example.com", "name": "Alice" }, "token": "eyJ..." }
+\`\`\`
+
+---
+
+### \`loginUser(req, res)\`
+
+Authenticates an existing user and returns a JWT token valid for **7 days**.
+
+**Request body:**
+\`\`\`json
+{ "email": "user@example.com", "password": "secret123" }
+\`\`\`
+
+Returns \`401\` for invalid credentials (intentionally vague to prevent email enumeration).
+
+---
+
+### \`authMiddleware(req, res, next)\`
+
+Express middleware for protecting routes. Extracts and verifies the JWT from the \`Authorization: Bearer <token>\` header.
+
+- Attaches decoded \`req.user\` object to the request on success
+- Returns \`401\` if token is missing, malformed, or expired
+
+## Security Notes
+
+- Passwords are hashed with **bcrypt** at cost factor 10 before storage
+- JWT tokens expire after **7 days** — consider refresh token strategy for production
+- Error messages for login use generic wording to prevent user enumeration attacks`,
+
+  py: `# LRUCache — Python Cache with TTL Support
+
+## Overview
+
+A pure-Python **Least Recently Used (LRU) cache** with per-entry TTL (time-to-live) expiry and hit tracking. Useful for caching database queries, API responses, or any expensive computation results.
+
+## Classes
+
+### \`CacheEntry\`
+
+A lightweight dataclass representing a single cached item.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| \`key\` | \`str\` | Cache key identifier |
+| \`value\` | \`Any\` | The cached value |
+| \`expires_at\` | \`float\` | Unix timestamp when entry expires |
+| \`hits\` | \`int\` | Number of times this entry was read (default: 0) |
+
+---
+
+### \`LRUCache\`
+
+The main cache class implementing LRU eviction with TTL support.
+
+#### Constructor
+
+\`\`\`python
+cache = LRUCache(capacity=100, default_ttl=300)
+\`\`\`
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| \`capacity\` | \`int\` | — | Maximum number of entries before eviction |
+| \`default_ttl\` | \`int\` | \`300\` | Default expiry in seconds (5 minutes) |
+
+#### Methods
+
+##### \`get(key: str) → Optional[Any]\`
+
+Retrieves a cached value by key. Returns \`None\` if missing or expired. On hit, promotes the entry to most-recently-used position and increments its \`hits\` counter.
+
+\`\`\`python
+result = cache.get("user:42")  # None if expired or not found
+\`\`\`
+
+##### \`set(key: str, value: Any, ttl: int = None) → None\`
+
+Stores a value in the cache. If the cache is full, the **least recently used** entry is evicted first. Accepts an optional per-entry TTL override.
+
+\`\`\`python
+cache.set("user:42", user_object, ttl=60)  # expires in 60s
+\`\`\`
+
+##### \`stats() → dict\`
+
+Returns cache health statistics.
+
+\`\`\`python
+{ "size": 42, "capacity": 100, "hit_count": 1830 }
+\`\`\`
+
+## Usage Example
+
+\`\`\`python
+cache = LRUCache(capacity=500, default_ttl=120)
+cache.set("config:theme", "dark")
+theme = cache.get("config:theme")  # "dark"
+print(cache.stats())               # { size: 1, capacity: 500, hit_count: 1 }
+\`\`\``,
+
+  sql: `# Analytics SQL Query Reference
+
+## Overview
+
+A collection of PostgreSQL analytical queries for building user engagement dashboards. Covers **Daily Active Users (DAU)** tracking and **cohort-based retention analysis**.
+
+---
+
+## Query 1 — Daily Active Users (DAU)
+
+Calculates unique active users and total event volume per day for the past 30 days, excluding bot and internal traffic.
+
+\`\`\`sql
+SELECT
+  DATE(created_at) as date,
+  COUNT(DISTINCT user_id) as dau,
+  COUNT(*) as total_events
+FROM user_events
+WHERE created_at >= NOW() - INTERVAL '30 days'
+  AND event_type NOT IN ('bot', 'internal')
+GROUP BY DATE(created_at)
+ORDER BY date DESC;
+\`\`\`
+
+**Output columns:**
+
+| Column | Type | Description |
+|--------|------|-------------|
+| \`date\` | date | Calendar day |
+| \`dau\` | integer | Distinct active users |
+| \`total_events\` | integer | All qualifying events that day |
+
+**Performance tip:** Add a composite index on \`(created_at, event_type)\` to speed up the range + filter scan on large tables.
+
+---
+
+## Query 2 — Weekly Cohort Retention
+
+Tracks what percentage of users who signed up in a given week are still active in subsequent weeks. Uses two CTEs for clean separation of cohort assignment and activity detection.
+
+**CTEs:**
+
+- **\`cohorts\`** — assigns each user to their signup week using \`DATE_TRUNC('week', MIN(created_at))\`
+- **\`activity\`** — finds all weeks in which each user had any event
+
+**Output columns:**
+
+| Column | Description |
+|--------|-------------|
+| \`cohort_week\` | The week the cohort signed up |
+| \`cohort_size\` | Total users in this cohort |
+| \`activity_week\` | Week being measured |
+| \`retained_users\` | Users from the cohort active that week |
+| \`retention_pct\` | Retention percentage (0–100) |
+
+**Interpreting results:** Week 0 retention should be ~100%. A healthy SaaS product typically shows 40–60% week-1 retention and stabilising around 20–30% by week-8.
+
+**Performance tip:** Ensure \`user_events.user_id\` and \`user_events.created_at\` are indexed. For large datasets, consider materializing the cohorts CTE as a table.`,
+
+  ts: `# NotificationService — NestJS Notification Module
+
+## Overview
+
+A resilient NestJS injectable service for delivering multi-channel notifications (email, SMS, push) with **automatic retry logic**, delivery status persistence, and event emission on success.
+
+## Interfaces
+
+### \`NotificationPayload\`
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| \`userId\` | \`string\` | Yes | Recipient's user ID |
+| \`type\` | \`'email' \| 'sms' \| 'push'\` | Yes | Delivery channel |
+| \`title\` | \`string\` | Yes | Notification subject/title |
+| \`body\` | \`string\` | Yes | Main notification content |
+| \`metadata\` | \`Record<string, unknown>\` | No | Optional contextual data |
+
+### \`SendResult\`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| \`success\` | \`boolean\` | Whether delivery succeeded |
+| \`messageId\` | \`string\` | Provider's message ID (on success) |
+| \`error\` | \`string\` | Error message (on failure) |
+| \`attempts\` | \`number\` | Total delivery attempts made |
+
+## Methods
+
+### \`send(payload: NotificationPayload): Promise<SendResult>\`
+
+Main entry point. Persists the notification with \`status: 'pending'\`, then attempts delivery up to **3 times** with exponential backoff (1s, 2s, 3s between retries).
+
+On success: updates DB record to \`status: 'sent'\` and emits \`notification.sent\` event.
+On all retries exhausted: updates DB to \`status: 'failed'\` and returns the error.
+
+\`\`\`typescript
+const result = await notificationService.send({
+  userId: 'user_123',
+  type: 'email',
+  title: 'Welcome!',
+  body: 'Thanks for signing up.'
+});
+// { success: true, messageId: 'msg_abc', attempts: 1 }
+\`\`\`
+
+### \`dispatch(payload)\` *(private)*
+
+Routes the payload to the correct provider (\`sendEmail\`, \`sendSMS\`, or \`sendPush\`) based on \`payload.type\`. Throws if type is unrecognised.
+
+## Events
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| \`notification.sent\` | \`{ id, userId, type, title, body }\` | Emitted on successful delivery |
+
+## Configuration
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| \`MAX_RETRIES\` | \`3\` | Maximum delivery attempts before giving up |
+| Retry backoff | 1s × attempt | Delay grows linearly with each retry |`
+};
+
+// ─── MOCK STATS ────────────────────────────────────────────────────────────
+const MOCK_STATS = {
+  js:  { funcs: 4, lines: 34, tokens: 847, time: '1.8s' },
+  py:  { funcs: 5, lines: 42, tokens: 912, time: '2.1s' },
+  sql: { funcs: 2, lines: 31, tokens: 763, time: '1.6s' },
+  ts:  { funcs: 3, lines: 47, tokens: 988, time: '2.3s' },
+};
+
+// ─── APP STATE ─────────────────────────────────────────────────────────────
+let currentDoc = '';
+let currentSample = null;
+
+function loadSample(key) {
+  document.querySelectorAll('.sample-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('s-' + key).classList.add('active');
+  document.getElementById('code-input').value = SAMPLES[key];
+  currentSample = key;
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', ['preview','markdown'][i] === tab));
+  document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', ['preview','markdown'][i] === tab));
+}
+
+function renderMarkdown(md) {
+  let html = md
+    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    .replace(/^\| (.+) \|$/gm, (m, row) => '<tr>' + row.split(' | ').map(c => `<td>${c}</td>`).join('') + '</tr>')
+    .replace(/^\|[-| :]+\|$/gm, '')
+    .replace(/((<tr>.*<\/tr>\s*)+)/gs, m => '<table>' + m.replace(/<tr><td>[-|: ]+<\/td><\/tr>/g,'') + '</table>')
+    .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>[\s\S]*?<\/li>\s*)+/g, m => '<ul>' + m + '</ul>')
+    .replace(/\n\n+/g, '</p><p>');
+  return '<div class="doc-md"><p>' + html + '</p></div>';
+}
+
+// Typewriter effect — streams text char by char into the preview
+function typewriterRender(mdText, onDone) {
+  const preview = document.getElementById('tab-preview');
+  preview.innerHTML = '<div class="doc-md"></div>';
+  const target = preview.querySelector('.doc-md');
+
+  // Stream in chunks for speed
+  const CHUNK = 12;
+  let i = 0;
+  let displayed = '';
+
+  function tick() {
+    if (i >= mdText.length) {
+      // Final render with proper markdown
+      preview.innerHTML = renderMarkdown(mdText);
+      onDone && onDone();
+      return;
+    }
+    displayed += mdText.slice(i, i + CHUNK);
+    i += CHUNK;
+    // Quick partial render
+    target.innerHTML = '<p>' + displayed.replace(/\n/g,'<br>') + '<span class="typing-cursor"></span></p>';
+    target.scrollTop = target.scrollHeight;
+    setTimeout(tick, 14);
+  }
+  tick();
+}
+
+async function generateDocs() {
+  const code = document.getElementById('code-input').value.trim();
+  if (!code) { alert('Please paste some code or click a sample above.'); return; }
+
+  const btn = document.getElementById('gen-btn');
+  const outBox = document.getElementById('output-box');
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Analyzing...';
+  outBox.classList.remove('empty');
+  outBox.innerHTML = '<p style="color:var(--text3);font-size:13px;padding:8px 0;">🤖 AI is reading your code...</p>';
+  document.getElementById('tabs-section').style.display = 'none';
+  document.getElementById('stats-section').style.display = 'none';
+  document.getElementById('copy-btn').style.display = 'none';
+
+  // Simulate realistic AI thinking delay (1.6 – 2.4 s)
+  const delay = 1600 + Math.random() * 800;
+  await new Promise(r => setTimeout(r, delay));
+
+  // Pick the matching mock doc, or generate a generic one
+  const key = currentSample || detectSample(code);
+  const doc = MOCK_DOCS[key] || buildGenericDoc(code);
+  const stats = MOCK_STATS[key] || { funcs: 3, lines: code.split('\n').length, tokens: 720, time: '1.9s' };
+
+  currentDoc = doc;
+
+  // Show stats
+  document.getElementById('stat-funcs').textContent = stats.funcs;
+  document.getElementById('stat-lines').textContent = stats.lines;
+  document.getElementById('stat-tokens').textContent = stats.tokens;
+  document.getElementById('stat-time').textContent = stats.time;
+  document.getElementById('stats-section').style.display = 'block';
+
+  // Show tabs section, hide placeholder
+  outBox.style.display = 'none';
+  document.getElementById('tabs-section').style.display = 'block';
+
+  // Activate preview tab
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===0));
+  document.querySelectorAll('.panel').forEach((p,i) => p.classList.toggle('active', i===0));
+
+  btn.innerHTML = '<div class="spinner"></div> Writing docs...';
+
+  // Stream the doc in with typewriter effect
+  typewriterRender(doc, () => {
+    document.getElementById('raw-md').textContent = doc;
+    document.getElementById('copy-btn').style.display = 'inline-flex';
+    btn.disabled = false;
+    btn.innerHTML = '✦ Generate Docs';
+  });
+}
+
+function detectSample(code) {
+  if (code.includes('bcrypt') || code.includes('jwt') || code.includes('express')) return 'js';
+  if (code.includes('def ') || code.includes('LRUCache') || code.includes('dataclass')) return 'py';
+  if (code.includes('SELECT') || code.includes('FROM ') || code.includes('GROUP BY')) return 'sql';
+  if (code.includes('Injectable') || code.includes('interface ') || code.includes(': Promise')) return 'ts';
+  return 'js';
+}
+
+function buildGenericDoc(code) {
+  const lines = code.split('\n').length;
+  const funcs = (code.match(/function\s+\w+|def\s+\w+|async\s+\w+\s*\(/g) || []).length || 2;
+  return `# Code Documentation
+
+## Overview
+
+This module contains ${funcs} function${funcs > 1 ? 's' : ''} across ${lines} lines of code. It handles core application logic with clear separation of concerns.
+
+## Functions
+
+### Main entry points
+
+The code exposes several key functions that form the public API of this module. Each function follows single-responsibility principles and includes error handling for edge cases.
+
+## Usage Example
+
+\`\`\`javascript
+// Import and initialize the module
+const module = require('./module');
+
+// Call with required parameters
+const result = await module.process(input);
+console.log(result);
+\`\`\`
+
+## Error Handling
+
+- Input validation is performed at the function entry point
+- Errors are propagated with descriptive messages
+- Edge cases return \`null\` or throw typed exceptions
+
+## Notes
+
+- All async functions return Promises
+- Follows ESLint standard style
+- Compatible with Node.js 18+`;
+}
+
+async function copyDoc() {
+  try {
+    await navigator.clipboard.writeText(currentDoc);
+    const t = document.getElementById('toast');
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2000);
+  } catch(e) {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = currentDoc;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+}
+
+// Auto-load first sample on start
+window.onload = () => loadSample('js');
+</script>
+</body>
+</html>
